@@ -1,0 +1,23 @@
+apply plugin: "application"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile files('/usr/local/opt/opencv3/share/OpenCV/java/opencv-300.jar')
+    compile 'org.slf4j:slf4j-api:1.7.12'
+    compile 'ch.qos.logback:logback-classic:1.1.3'
+    testCompile 'junit:junit:4.11'
+}
+
+mainClassName = "jp.saiki.myfirsttoy.MainApp"
+//applicationDefaultJvmArgs = ["-Djava.library.path=\"/usr/local/opt/opencv3/share/OpenCV/java\""]
+
+startScripts {
+    classpath += files('/usr/local/opt/opencv3/share/OpenCV/java/opencv-300.jar')
+}
+
+run {
+    systemProperty 'java.library.path', "/usr/local/opt/opencv3/share/OpenCV/java"
+}
