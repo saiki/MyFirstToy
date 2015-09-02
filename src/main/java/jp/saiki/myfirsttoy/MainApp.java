@@ -32,20 +32,18 @@ public class MainApp extends Application {
     public void start(Stage stage) throws Exception {
 
         MainApp.primaryState = stage;
-        videoCapture = new VideoCapture();
-        videoCapture.open(0);
+        stage.setMaximized(true);
+        stage.setFullScreen(true);
+        stage.setResizable(true);
 
         Parent root = FXMLLoader.load(getClass().getResource("/fxml/Main.fxml"));
-        
+
         Scene scene = new Scene(root);
         scene.getStylesheets().add("/styles/Styles.css");
 
         stage.setTitle("JavaFX and Maven");
-        stage.setScene(scene);
         stage.initStyle(StageStyle.TRANSPARENT);
-        stage.setMaximized(true);
-        stage.setFullScreen(true);
-        stage.setResizable(true);
+        stage.setScene(scene);
         stage.show();
     }
 
@@ -69,6 +67,8 @@ public class MainApp extends Application {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
+        videoCapture = new VideoCapture();
+        videoCapture.open(0);
         launch(args);
     }
 

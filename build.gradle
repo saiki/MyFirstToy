@@ -12,7 +12,9 @@ dependencies {
 }
 
 mainClassName = "jp.saiki.myfirsttoy.MainApp"
-//applicationDefaultJvmArgs = ["-Djava.library.path=\"/usr/local/opt/opencv3/share/OpenCV/java\""]
+
+sourceCompatibility = '1.8' // -source
+targetCompatibility = '1.8' // -target
 
 startScripts {
     classpath += files('/usr/local/opt/opencv3/share/OpenCV/java/opencv-300.jar')
