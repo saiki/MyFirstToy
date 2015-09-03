@@ -9,24 +9,22 @@ import javafx.stage.StageStyle;
 import org.opencv.core.Core;
 import org.opencv.videoio.VideoCapture;
 
+import javax.security.auth.Destroyable;
+
 
 public class MainApp extends Application {
 
-    static{
+    static {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
     }
     
     private static Stage primaryState = null;
 
-    private static VideoCapture videoCapture;
-
     static Stage getPrimaryState() {
         return primaryState;
     }
 
-    static VideoCapture getVideoCapture() {
-        return videoCapture;
-    }
+    private Controller currentController;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -36,26 +34,18 @@ public class MainApp extends Application {
         stage.setFullScreen(true);
         stage.setResizable(true);
 
-        Parent root = FXMLLoader.load(getClass().getResource("/fxml/Main.fxml"));
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Main.fxml"));
+        Parent root = loader.load();
+        this.currentController = loader.getController();
 
         Scene scene = new Scene(root);
-        scene.getStylesheets().add("/styles/Styles.css");
-
-        stage.setTitle("JavaFX and Maven");
-        stage.initStyle(StageStyle.TRANSPARENT);
         stage.setScene(scene);
         stage.show();
     }
 
     @Override
     public void stop() throws Exception {
-        if ( this.videoCapture == null ) {
-            return;
-        }
-        if ( ! this.videoCapture.isOpened() ) {
-            return;
-        }
-        this.videoCapture.release();
+        this.currentController.close();
     }
 
     /**
@@ -67,8 +57,6 @@ public class MainApp extends Application {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        videoCapture = new VideoCapture();
-        videoCapture.open(0);
         launch(args);
     }
 

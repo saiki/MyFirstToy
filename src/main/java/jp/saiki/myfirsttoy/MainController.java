@@ -6,41 +6,37 @@ package jp.saiki.myfirsttoy;
  * and open the template in the editor.
  */
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import javafx.concurrent.Service;
+import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.paint.Color;
-import javafx.util.Duration;
 import org.opencv.core.*;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.videoio.VideoCapture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * FXML Controller class
  *
  * @author akio
  */
-public class MainController implements Initializable {
+public class MainController implements Controller {
 
     private static final Logger logger = LoggerFactory.getLogger(MainController.class);
 
@@ -49,6 +45,8 @@ public class MainController implements Initializable {
 
     @FXML
     private ImageView cameraView;
+
+    private VideoCapture videoCapture;
 
     public AnchorPane getRoot() {
         return this.root;
@@ -85,6 +83,59 @@ public class MainController implements Initializable {
             "haarcascade_upperbody.xml"
     };
 
+
+
+    private Service<Image> service = new Service<Image>() {
+
+        final List<CascadeClassifier> classifiers = Arrays.stream(HAAR_FACE_CASCADE_XML).parallel().map(xmlFileName ->
+                        BASE_PATH.resolve(xmlFileName)
+        ).map((Path path) -> {
+            CascadeClassifier cl = new CascadeClassifier();
+            cl.load(path.toAbsolutePath().toString());
+            return cl;
+        }).collect(Collectors.toList());
+
+        @Override
+        protected Task<Image> createTask() {
+            return new Task<Image>() {
+                @Override
+                protected Image call() throws Exception {
+                    Mat cap   = new Mat();
+                    videoCapture.read(cap);
+                    if ( cap.empty() ) {
+                        return null;
+                    }
+                    CascadeClassifier classifier = classifiers.get(0);
+                    Mat gray = new Mat();
+                    Imgproc.cvtColor(cap, gray, Imgproc.COLOR_RGB2GRAY);
+                    MatOfRect rects = new MatOfRect();
+                    classifier.detectMultiScale(gray, rects);
+                    for ( Rect rect : rects.toArray() ) {
+                        Point leftTop = new Point(rect.x, rect.y);
+                        Point rightBottom = new Point(rect.x + rect.width, rect.y + rect.height);
+                        Imgproc.rectangle(cap, leftTop, rightBottom, new Scalar(255, 255, 255));
+                    }
+                    Mat flip = new Mat();
+                    Core.flip(cap, flip, 1);
+                    Mat bgr = new Mat();
+                    Imgproc.cvtColor(flip, bgr, Imgproc.COLOR_RGB2BGR);
+                    Mat frame = new Mat();
+                    Imgproc.resize(bgr, frame, new Size(root.getWidth(), root.getHeight()));
+                    int type = BufferedImage.TYPE_BYTE_GRAY;
+                    if ( frame.channels() > 1 ) {
+                        type = BufferedImage.TYPE_3BYTE_BGR;
+                    }
+                    int bufferSize = frame.channels() * frame.cols() * frame.rows();
+                    byte [] b = new byte[bufferSize];
+                    frame.get(0, 0, b); // get all the pixels
+                    BufferedImage image = new BufferedImage(frame.cols(),frame.rows(), type);
+                    image.getRaster().setDataElements(0, 0, frame.cols(), frame.rows(), b);
+                    return SwingFXUtils.toFXImage(image, null);
+                }
+            };
+        }
+    };
+
     /**
      * Initializes the controller class.
      */
@@ -94,58 +145,27 @@ public class MainController implements Initializable {
         this.cameraView.fitWidthProperty().bind(MainApp.getPrimaryState().widthProperty());
         this.cameraView.fitHeightProperty().bind(MainApp.getPrimaryState().heightProperty());
 
-        final List<CascadeClassifier> classifiers = Arrays.stream(HAAR_FACE_CASCADE_XML).parallel().map(xmlFileName ->
-            BASE_PATH.resolve(xmlFileName)
-        ).map((Path path) -> {
-            CascadeClassifier cl = new CascadeClassifier();
-            cl.load(path.toAbsolutePath().toString());
-            return cl;
-        }).collect(Collectors.toList());
+        this.videoCapture = new VideoCapture();
+        this.videoCapture.open(0);
 
-
-        Timeline timer = new Timeline(new KeyFrame(Duration.millis(100), new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent actionEvent) {
-                Mat cap   = new Mat();
-                MainApp.getVideoCapture().read(cap);
-                if ( cap.empty() ) {
-                    return;
-                }
-                Mat flip = new Mat();
-                Core.flip(cap, flip, 1);
-                Mat bgr = new Mat();
-                Imgproc.cvtColor(flip, bgr, Imgproc.COLOR_RGB2BGR);
-                Mat frame = new Mat();
-                Imgproc.resize(bgr, frame, new Size(root.getWidth(), root.getHeight()));
-
-                classifiers.stream().parallel().map(cascade -> {
-                    Mat gray = new Mat();
-                    Imgproc.cvtColor(frame, gray, Imgproc.COLOR_RGB2GRAY);
-                    MatOfRect rect = new MatOfRect();
-                    cascade.detectMultiScale(gray, rect);
-                    return rect;
-                }).sequential().forEach(matOfRect -> {
-                    List<Rect> rectList = matOfRect.toList();
-                    for ( Rect rect : rectList ) {
-                        Point leftTop = new Point(rect.x, rect.y);
-                        Point rightBottom = new Point(rect.x+rect.width, rect.y+rect.height);
-                        Imgproc.rectangle(frame, leftTop, rightBottom, new Scalar(255, 255, 255));
-                    }
-                });
-
-                int type = BufferedImage.TYPE_BYTE_GRAY;
-                if ( frame.channels() > 1 ) {
-                    type = BufferedImage.TYPE_3BYTE_BGR;
-                }
-                int bufferSize = frame.channels() * frame.cols() * frame.rows();
-                byte [] b = new byte[bufferSize];
-                frame.get(0, 0, b); // get all the pixels
-                BufferedImage image = new BufferedImage(frame.cols(),frame.rows(), type);
-                image.getRaster().setDataElements(0, 0, frame.cols(), frame.rows(), b);
-                cameraView.setImage(SwingFXUtils.toFXImage(image, null));
+        this.service.setOnSucceeded(workerStateEvent -> {
+            if (this.service.getValue() != null) {
+                this.cameraView.setImage(this.service.getValue());
             }
-        }));
-        timer.setCycleCount(Timeline.INDEFINITE);
-        timer.play();
+            this.service.restart();
+        });
+        this.service.start();
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.service.cancel();
+        if ( this.videoCapture == null ) {
+            return;
+        }
+        if ( ! this.videoCapture.isOpened() ) {
+            return;
+        }
+        this.videoCapture.release();
     }
 }
